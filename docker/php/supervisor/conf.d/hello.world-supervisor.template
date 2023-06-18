@@ -1,0 +1,16 @@
+[program:hello-world]
+process_name=%(program_name)s_%(process_num)02d
+numprocs=1
+command=echo "Hello World from Supervisor Process"
+autostart=true
+autorestart=true
+user=root
+
+;redirect_stderr=true
+;stderr_logfile=/proc/1/fd/2
+stderr_logfile=/var/log/supervisord/hello-world.stderr.log
+stderr_logfile_maxbytes=0
+
+;stdout_logfile=/proc/1/fd/1
+stdout_logfile=/var/log/supervisord/hello-world.stdout.log
+stdout_logfile_maxbytes=0

@@ -1,0 +1,125 @@
+version: '3.7'
+
+networks:
+  app-network:
+    driver: bridge
+    name: app-network
+
+volumes:
+  mysql-data:
+    name: app_mysql-data
+  redis-data:
+    name: app_redis-data
+
+services:
+  php:
+    build:
+      context: ./docker/php
+      dockerfile:
+        Dockerfile
+    volumes:
+      - ./:/var/www:delegated
+      - ./docker/php/php-fpm.d/www.conf:/usr/local/etc/php-fpm.d/www.conf
+      - ./docker/php/php/custom.ini.template:/usr/local/etc/php/conf.d/custom.ini.template
+      - ./docker/php/php/php-cli.ini:/usr/local/etc/php/php-cli.ini
+      - ./docker/php/php/healthcheck.ini:/usr/local/etc/php/healthcheck.ini
+      - ./docker/php/loggly:/etc/rsyslog.d
+      - ./docker/php/startup.sh:/usr/local/bin/startup.sh
+      - ./docker/php/supervisor:/etc/supervisor
+      - ./docker/php/cronjobs:/usr/local/var/cronjobs
+      - ./docker/php/custom-entrypoint.sh:/usr/local/bin/custom-entrypoint.sh:cached
+    environment:
+      - PHP_SESSION_SAVE_HANDLER=files
+      - PHP_SESSION_SAVE_PATH=/tmp
+      - PHP_SEND_MAIL_PATH=""
+      - ENABLE_DB_MIGRATIONS=no
+      - ENABLE_CRONJOBS=no
+      - ENABLE_SUPERVISOR=no
+      - CRONJOB_LIST=specific,common
+      - SUPERVISOR_LIST=hello.world
+    entrypoint: ["/usr/local/bin/custom-entrypoint.sh"]
+    command: ["php-fpm"]
+    networks:
+      - app-network
+
+  nginx:
+    build:
+      context: ./docker/nginx
+      dockerfile:
+        Dockerfile
+    volumes:
+      - ./:/var/www:delegated
+      - ./docker/nginx/ssl/certificate:/etc/nginx/ssl
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./docker/nginx/templates/app-ssl.conf.template:/etc/nginx/templates/app.conf.template
+    ports:
+      - "443:443"
+    environment:
+      - NGINX_SERVER_NAME=${APP_DOMAIN}
+      - NGINX_ROOT=/var/www/public
+      - NGINX_CONTENT_EXPIRY=7d
+      - NGINX_ACCESS_LOG=/var/log/nginx/access.log loggly-json
+      - NGINX_ERROR_LOG=/var/log/nginx/error.log error
+      - NGINX_SECURITY_REPORT_URI=
+      - NGINX_SSL_CERTIFICATE=/etc/nginx/ssl/dummy.crt
+      - NGINX_SSL_CERTIFICATE_KEY=/etc/nginx/ssl/dummy.key
+      - FAST_CGI_PASS=php
+      - FAST_CGI_READ_TIMEOUT=600
+      - FAST_CGI_SEND_TIMEOUT=600
+      - ECHO_SERVER_URL=https://echo-server:6001
+    depends_on:
+      - php
+    networks:
+      app-network:
+        aliases:
+          - ${APP_DOMAIN}
+
+  mysql:
+    build:
+      context: ./docker/mysql
+      dockerfile:
+        Dockerfile
+    command: --default-authentication-plugin=mysql_native_password
+    restart: unless-stopped
+    tty: true
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./docker/mysql/my.cnf:/etc/mysql/conf.d/my.cnf:cached
+      - mysql-data:/var/lib/mysql:delegated
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE}
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      SERVICE_TAGS: dev
+      SERVICE_NAME: mysql
+    networks:
+      - app-network
+    cap_add:
+      - SYS_NICE  # CAP_SYS_NICE - Prevents mbind: Operation not permitted
+
+  npm:
+    image: node:14.19
+    volumes:
+      - ./:/var/www:delegated
+    working_dir: /var/www
+    tty: true
+    entrypoint: [ 'bash' ]
+    networks:
+      - app-network
+
+  redis:
+    build:
+      context: ./docker/redis
+      dockerfile:
+        Dockerfile
+    command: [ "redis-server", "/usr/local/etc/redis/redis.conf", "--appendonly", "yes" ] # Redis notes : --appendonly persists the data
+    ports:
+      - "6379:6379"
+    networks:
+      - app-network
+    volumes:
+      - ./docker/redis/redis.conf:/usr/local/etc/redis/redis.conf:cached
+      - redis-data:/data:delegated
+

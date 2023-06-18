@@ -1,0 +1,113 @@
+
+server {
+    # Listening on port
+    listen 80;
+    listen [::]:80;
+
+    # Server Name
+    server_name ${NGINX_SERVER_NAME};
+
+    # Site Root
+    root ${NGINX_ROOT};
+
+    # Access and error logs.
+    error_log ${NGINX_ERROR_LOG};
+    access_log ${NGINX_ACCESS_LOG};
+
+    # Include Additional Headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header Strict-Transport-Security "max-age=63072000; includeSubdomains" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Content-Security-Policy-Report-Only "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: *.cloudfront.net *.helpscout.net *.gstatic.com *.segment.com *.segment.io *.youtube.com maps.gstatic.com *.googleapis.com *.google-analytics.com *.google.com *.facebook.net *.facebook.com *.twitter.com *.jquery.com *.fontawesome.com *.cloudflare.com; report-uri ${NGINX_SECURITY_REPORT_URI}";
+    add_header Content-Security-Policy "default-src *  data: blob: filesystem: about: ws: wss: 'unsafe-inline' 'unsafe-eval'; script-src * data: blob: 'unsafe-inline' 'unsafe-eval'; connect-src * data: blob: 'unsafe-inline'; img-src * data: blob: 'unsafe-inline'; frame-src * data: blob: ; style-src * data: blob: 'unsafe-inline'; font-src * data: blob: 'unsafe-inline';" always;
+    add_header Referrer-Policy "strict-origin" always;
+    add_header Expect-CT "max-age=604800, enforce, report-uri='${NGINX_SECURITY_REPORT_URI}'" always;
+
+    index index.php index.html index.htm;
+    error_page 404 /index.php;
+    charset utf-8;
+
+    location ~ \.php$ {
+        fastcgi_split_path_info ^(.+\.php)(/.+)$;
+        fastcgi_pass ${FAST_CGI_PASS}:9000;
+        fastcgi_index index.php;
+        fastcgi_read_timeout ${FAST_CGI_READ_TIMEOUT};
+        fastcgi_send_timeout ${FAST_CGI_SEND_TIMEOUT};
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_param PATH_INFO $fastcgi_path_info;
+        fastcgi_param HTTP_X_REQUEST_ID $request_id;
+        fastcgi_param SERVER_NAME $host;
+        fastcgi_param TRUE-CLIENT-IP $http_true_client_ip;
+        include fastcgi_params;
+        proxy_max_temp_file_size 0;
+        fastcgi_buffers 256 4k;
+        fastcgi_buffer_size 4k;
+        client_body_buffer_size 1M;
+        client_max_body_size 25M;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    # Php Status
+    location ~ ^/(status|ping)$ {
+        include fastcgi_params;
+        fastcgi_pass ${FAST_CGI_PASS}:9000;
+        fastcgi_index index.php;
+        fastcgi_read_timeout ${FAST_CGI_READ_TIMEOUT};
+        fastcgi_send_timeout ${FAST_CGI_SEND_TIMEOUT};
+        proxy_connect_timeout 600;
+        proxy_send_timeout 600;
+        proxy_read_timeout 600;
+        send_timeout 600;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        access_log off;
+    }
+
+    # Nginx Status
+    location ~ ^/(/nginx_status)$ {
+        stub_status on;
+        access_log off;
+        allow 127.0.0.1;
+        allow ::1;
+        deny all;
+    }
+
+    # deny access to web.config
+    location /web.config {
+        deny  all;
+    }
+
+    # Media: images, icons, video, audio, HTC
+    location ~* \.(?:jpg|jpeg|gif|png|ico|cur|gz|svg|svgz|mp4|ogg|ogv|webm|htc|eot|woff|woff2|txt)$ {
+        expires ${NGINX_CONTENT_EXPIRY};
+        access_log off;
+        log_not_found off;
+        add_header Cache-Control "public";
+    }
+
+    # CSS and Javascript add expiry headers
+    location ~* \.(?:css|js)$ {
+        expires ${NGINX_CONTENT_EXPIRY};
+        access_log off;
+        log_not_found off;
+        add_header Cache-Control "public";
+    }
+
+    # Deny unwanted requesets
+    location ~ /\.(?!well-known).* {
+        deny all;
+    }
+
+}
+
+server {
+    # Listening on port 443
+    listen 443 http2;
+    listen [::]:443 http2;
+
+    # Redirect to non-secure URL
+    return 301 ${NGINX_NONSSL_URL}$request_uri;
+}

@@ -1,0 +1,8 @@
+# Stops emails from being sent for every cron (todo fix and set up sendmail path for the cron to run successfully)
+MAILTO=""
+
+# This cron will execute laravel scheduler after every minute
+# * * * * * /usr/local/bin/php /var/www/artisan schedule:run >> /var/log/crond/common-cronjobs.log
+
+# This cron job will print "Hello World" every minutes
+* * * * * echo "Hello World from common-cronjobs after evert minute" >> /var/log/crond/common-cronjobs.log

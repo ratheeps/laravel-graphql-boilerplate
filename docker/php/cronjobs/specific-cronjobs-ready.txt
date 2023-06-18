@@ -1,0 +1,8 @@
+# This cron job will print "Hello World" every minutes
+*/30 * * * * echo "Hello World after 30 Minutes" >> /var/log/cron/specific-cronjobs.log
+
+# This cron job will print "Hello World" every minutes
+* * * * * echo "Hello World from specific-cronjobs after every minute" >> /var/log/cron/specific-cronjobs.log
+
+# This cron job will execute after every 5 minutes
+*/5 * * * * sh /usr/local/bin/cron-scripts/common.sh >> /var/log/cron/specific-cronjobs.log

@@ -1,0 +1,20 @@
+[program:laravel-worker]
+process_name=%(program_name)s_%(process_num)02d
+command=php /var/www/artisan queue:work --sleep=5 --tries=3 --timeout=600
+autostart=true
+autorestart=true
+startretries=1
+startsecs=1
+user=root
+killasgroup=true
+stopasgroup=true
+numprocs=1
+
+;redirect_stderr=true
+;stderr_logfile=/proc/1/fd/2
+stderr_logfile=/var/log/supervisord/laravel-worker.stderr.log
+stderr_logfile_maxbytes=0
+
+;stdout_logfile=/proc/1/fd/1
+stdout_logfile/var/log/supervisord/laravel-worker.stdout.log
+stdout_logfile_maxbytes=0
