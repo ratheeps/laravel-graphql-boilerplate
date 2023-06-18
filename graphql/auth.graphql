@@ -1,0 +1,20 @@
+type AuthUser {
+    id: ID!
+    name: String!
+    email: String!
+}
+
+input LoginInput {
+    email: String! @rules(apply: ["required", "email"], attribute: "email address")
+    password: String! @rules(apply: ["required", "min:8"])
+}
+
+type AuthPayload {
+    accessToken: String,
+    tokenType: String,
+    user: AuthUser!
+}
+
+type Mutation {
+    login(input: LoginInput @spread): AuthPayload! @field(resolver: "App\\GraphQL\\Mutations\\Auth\\Login@resolve")
+}
